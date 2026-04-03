@@ -6,6 +6,7 @@ import { PrismaClient } from '@prisma/client';
 import { UserService } from './services/UserService';
 import { getRedis, disconnectRedis } from './db/redis';
 import { deviceService } from './services/DeviceService';
+import { webSocketService } from './services/WebSocketService';
 
 const prisma = new PrismaClient();
 const userService = new UserService(prisma);
@@ -40,6 +41,7 @@ const buildApp = async (): Promise<FastifyInstance> => {
   // 注册路由
   await app.register(require('./routes/auth'), { prefix: '/api/v1/auth' });
   await app.register(require('./routes/users'), { prefix: '/api/v1/users' });
+  await app.register(require('./routes/canvas'), { prefix: '/api/v1/canvas' });
 
   // 全局错误处理
   app.setErrorHandler((error, request, reply) => {
@@ -62,8 +64,11 @@ const start = async () => {
   const port = parseInt(process.env.PORT || '3000', 10);
 
   try {
-    await app.listen({ port, host });
+    const server = await app.listen({ port, host });
     console.log(`🚀 Server running at http://${host}:${port}`);
+    
+    // 初始化 WebSocket
+    webSocketService.initialize(server);
   } catch (err) {
     app.log.error(err);
     process.exit(1);
