@@ -7,11 +7,17 @@ import 'presentation/screens/register_screen.dart';
 import 'presentation/screens/canvas_screen.dart';
 import 'presentation/screens/profile_screen.dart';
 import 'presentation/screens/color_rights_screen.dart';
+import 'presentation/screens/onboarding_screen.dart';
 
 /// 路由配置
 final GoRouter router = GoRouter(
-  initialLocation: '/login',
+  initialLocation: '/onboarding',
   routes: [
+    GoRoute(
+      path: '/onboarding',
+      name: 'onboarding',
+      builder: (context, state) => const OnboardingScreen(),
+    ),
     GoRoute(
       path: '/login',
       name: 'login',
