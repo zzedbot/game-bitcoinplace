@@ -169,20 +169,20 @@ jobs:
 
 | 任务 ID | 任务描述 | 优先级 | 预估工时 | 状态 |
 |---|---|---|---|---|
-| BE-1.1 | 初始化 Node.js + Fastify + TypeScript 项目 | P0 | 4h | ⬜ |
-| BE-1.1T | 配置 Vitest 测试框架 + 编写 Hello World 测试 | P0 | 2h | ⬜ |
-| BE-1.2 | 配置 Prisma ORM + PostgreSQL 连接 | P0 | 4h | ⬜ |
-| BE-1.2T | 编写数据库连接测试 (Testcontainers) | P0 | 2h | ⬜ |
-| BE-1.3 | 设计并实现用户 Schema (User 表) | P0 | 4h | ⬜ |
-| BE-1.3T | 编写 User Schema 验证测试 | P0 | 2h | ⬜ |
-| BE-1.4 | 实现 JWT 认证插件 | P0 | 4h | ⬜ |
-| BE-1.4T | 编写 JWT 签发/验证测试 (边界条件) | P0 | 4h | ⬜ |
-| BE-1.5 | 实现注册/登录/刷新 Token API | P0 | 8h | ⬜ |
-| BE-1.5T | 编写 Auth API 集成测试 (Supertest) | P0 | 4h | ⬜ |
-| BE-1.6 | 配置 Redis 连接 | P0 | 2h | ⬜ |
-| BE-1.6T | 编写 Redis 连接测试 | P0 | 1h | ⬜ |
-| BE-1.7 | 实现设备指纹识别逻辑 | P1 | 8h | ⬜ |
-| BE-1.7T | 编写设备指纹生成/验证测试 | P1 | 4h | ⬜ |
+| BE-1.1 | 初始化 Node.js + Fastify + TypeScript 项目 | P0 | 4h | ✅ |
+| BE-1.1T | 配置 Vitest 测试框架 + 编写 Hello World 测试 | P0 | 2h | ✅ |
+| BE-1.2 | 配置 Prisma ORM + PostgreSQL 连接 | P0 | 4h | ✅ |
+| BE-1.2T | 编写数据库连接测试 (Testcontainers) | P0 | 2h | ✅ |
+| BE-1.3 | 设计并实现用户 Schema (User 表) | P0 | 4h | ✅ |
+| BE-1.3T | 编写 User Schema 验证测试 | P0 | 2h | ✅ |
+| BE-1.4 | 实现 JWT 认证插件 | P0 | 4h | ✅ |
+| BE-1.4T | 编写 JWT 签发/验证测试 (边界条件) | P0 | 4h | ✅ |
+| BE-1.5 | 实现注册/登录/刷新 Token API | P0 | 8h | ✅ |
+| BE-1.5T | 编写 Auth API 集成测试 (Supertest) | P0 | 4h | ✅ |
+| BE-1.6 | 配置 Redis 连接 | P0 | 2h | ✅ |
+| BE-1.6T | 编写 Redis 连接测试 | P0 | 1h | ✅ |
+| BE-1.7 | 实现设备指纹识别逻辑 | P1 | 8h | ✅ |
+| BE-1.7T | 编写设备指纹生成/验证测试 | P1 | 4h | ✅ |
 | BE-1.8 | 代码覆盖率检查 + 修复未覆盖分支 | P0 | 4h | ⬜ |
 
 **Week 1 交付物：**
