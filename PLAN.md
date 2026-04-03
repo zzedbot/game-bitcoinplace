@@ -199,8 +199,8 @@ jobs:
 |---|---|---|---|---|
 | BE-2.1 | 设计染色权 Schema (ColorRight 表) | P0 | 4h | ✅ |
 | BE-2.1T | 编写 ColorRight Schema 验证测试 | P0 | 2h | ✅ |
-| BE-2.2 | 实现 Redis bitfield 存储画布状态 | P0 | 8h | ⬜ |
-| BE-2.2T | 编写 bitfield 读写测试 (边界/并发) | P0 | 4h | ⬜ |
+| BE-2.2 | 实现 Redis bitfield 存储画布状态 | P0 | 8h | ✅ |
+| BE-2.2T | 编写 bitfield 读写测试 (边界/并发) | P0 | 4h | ✅ |
 | BE-2.3 | 实现画布查询 API (全量/区域/单点) | P0 | 8h | ✅ |
 | BE-2.3T | 编写画布查询 API 测试 (缓存命中/未命中) | P0 | 4h | ✅ |
 | BE-2.4 | 实现染色 API (验证 + 执行 + 广播) | P0 | 8h | ✅ |
