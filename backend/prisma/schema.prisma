@@ -1,0 +1,134 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// User 表 - 用户账户
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  username  String   @unique
+  password  String   // bcrypt hashed
+  avatar    String?  // 头像 URL
+  balance   BigInt   @default(0) // 像素币余额 (最小单位：PX)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // 关联
+  colorRights ColorRight[]
+  auctions    Auction[]
+  bids        Bid[]
+  transactions Transaction[]
+  
+  @@index([email])
+  @@index([username])
+  @@map("users")
+}
+
+/// ColorRight 表 - 染色权
+model ColorRight {
+  id        String   @id @default(uuid())
+  userId    String
+  x         Int      // 坐标 X (0-6999)
+  y         Int      // 坐标 Y (0-2999)
+  zoneIndex Int      // 矿区索引 (0-20)
+  color     Int?     // 当前颜色 (0-15), null 表示未使用
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // 关联
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  auction Auction?
+  
+  @@unique([x, y]) // 每个坐标只能有一个染色权
+  @@index([userId])
+  @@index([zoneIndex])
+  @@index([used])
+  @@map("color_rights")
+}
+
+/// Auction 表 - 拍卖
+model Auction {
+  id          String      @id @default(uuid())
+  sellerId    String
+  colorRightId String      @unique
+  startingPrice BigInt
+  currentPrice BigInt
+  buyNowPrice BigInt?     // 一口价
+  status      AuctionStatus @default(ACTIVE)
+  startTime   DateTime   @default(now())
+  endTime     DateTime
+  winnerId    String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  
+  // 关联
+  seller     User         @relation(fields: [sellerId], references: [id])
+  colorRight ColorRight   @relation(fields: [colorRightId], references: [id])
+  bids       Bid[]
+  
+  @@index([sellerId])
+  @@index([status])
+  @@index([endTime])
+  @@map("auctions")
+}
+
+enum AuctionStatus {
+  ACTIVE
+  SOLD
+  EXPIRED
+  CANCELLED
+}
+
+/// Bid 表 - 竞价
+model Bid {
+  id        String   @id @default(uuid())
+  auctionId String
+  bidderId  String
+  amount    BigInt
+  createdAt DateTime @default(now())
+  
+  // 关联
+  auction Auction @relation(fields: [auctionId], references: [id], onDelete: Cascade)
+  bidder  User    @relation(fields: [bidderId], references: [id])
+  
+  @@index([auctionId])
+  @@index([bidderId])
+  @@map("bids")
+}
+
+/// Transaction 表 - 交易记录
+model Transaction {
+  id        String         @id @default(uuid())
+  userId    String
+  type      TransactionType
+  amount    BigInt
+  balance   BigInt         // 交易后余额
+  reference String?        // 关联 ID (拍卖 ID 等)
+  createdAt DateTime       @default(now())
+  
+  // 关联
+  user User @relation(fields: [userId], references: [id])
+  
+  @@index([userId])
+  @@index([type])
+  @@map("transactions")
+}
+
+enum TransactionType {
+  DEPOSIT
+  WITHDRAW
+  REWARD
+  PURCHASE
+  SALE
+  AUCTION_WIN
+  FEE
+}
