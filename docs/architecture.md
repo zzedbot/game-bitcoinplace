@@ -38,7 +38,7 @@
                                 │
                                 ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│                       应用服务层                                     │
+│                       应用服务层 (Node.js + TypeScript)              │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐ │
 │  │ 用户服务     │  │ 画布服务     │  │ 拍卖服务     │  │ 通知服务     │ │
 │  │ User Service│  │CanvasService│  │AuctionService│ │NotifyService│ │
@@ -56,6 +56,8 @@
 │  │ - 分配逻辑   │  │ - 在线用户   │  │ - 拍卖到期   │                    │
 │  │ - 减半管理   │  │ - 心跳检测   │  │ - 数据统计   │                    │
 │  └─────────────┘  └─────────────┘  └─────────────┘                    │
+│                                                                        │
+│  技术栈：Fastify + TypeScript + Prisma + BullMQ                       │
 └─────────────────────────────────────────────────────────────────────┘
                                 │
               ┌─────────────────┼─────────────────┐
@@ -73,9 +75,568 @@
 
 ---
 
-## 2. 核心模块设计
+## 2. 后端技术栈
 
-### 2.1 画布服务 (CanvasService)
+### 2.1 技术选型
+
+```
+Node.js 20+ LTS + TypeScript
+├── Web 框架：Fastify v4          # 高性能 HTTP 框架 (QPS > 50k)
+├── ORM：Prisma v5                # 类型安全的数据库 ORM
+├── WebSocket：ws v8              # 原生 WebSocket 实现
+├── 任务队列：BullMQ v4           # Redis 驱动的任务队列
+├── 认证：@fastify/jwt            # JWT 认证插件
+├── 验证：@fastify/type-provider-typebox  # JSON Schema 验证
+├── 日志：pino                    # 高性能日志库
+├── 测试：Vitest + Supertest      # 单元测试 + 集成测试
+└── 部署：Docker + K8s            # 容器化部署
+```
+
+**为什么选择 Fastify？**
+- ✅ 性能最优：Node.js 框架中 QPS 最高 (~50k req/s)
+- ✅ 插件生态：官方插件覆盖 JWT、CORS、速率限制等
+- ✅ 类型安全：完整 TypeScript 支持
+- ✅ 低开销：异步性能优异，适合高并发
+- ✅ 易测试：依赖注入友好
+
+### 2.2 项目结构
+
+```
+backend/
+├── src/
+│   ├── main.ts                    # 应用入口
+│   ├── app.ts                     # Fastify 实例配置
+│   │
+│   ├── config/                    # 配置
+│   │   ├── index.ts               # 配置导出
+│   │   ├── database.ts            # 数据库配置
+│   │   ├── redis.ts               # Redis 配置
+│   │   └── jwt.ts                 # JWT 配置
+│   │
+│   ├── plugins/                   # Fastify 插件
+│   │   ├── auth.ts                # 认证插件
+│   │   ├── rate-limit.ts          # 限流插件
+│   │   ├── cors.ts                # CORS 插件
+│   │   └── websocket.ts           # WebSocket 插件
+│   │
+│   ├── routes/                    # 路由
+│   │   ├── health.ts              # 健康检查
+│   │   ├── auth/                  # 认证
+│   │   │   ├── register.ts
+│   │   │   ├── login.ts
+│   │   │   └── refresh.ts
+│   │   ├── canvas/                # 画布
+│   │   │   ├── region.ts          # GET /canvas/region
+│   │   │   ├── color.ts           # POST /canvas/color
+│   │   │   └── state.ts           # GET /canvas/state
+│   │   ├── auctions/              # 拍卖
+│   │   │   ├── list.ts
+│   │   │   ├── create.ts
+│   │   │   ├── bid.ts
+│   │   │   └── buy-now.ts
+│   │   ├── wallet/                # 钱包
+│   │   │   ├── balance.ts
+│   │   │   └── transactions.ts
+│   │   └── user/                  # 用户
+│   │       ├── profile.ts
+│   │       └── inventory.ts
+│   │
+│   ├── services/                  # 业务逻辑
+│   │   ├── canvas.service.ts      # 画布服务
+│   │   ├── auction.service.ts     # 拍卖服务
+│   │   ├── economy.service.ts     # 经济服务
+│   │   ├── websocket.service.ts   # WebSocket 服务
+│   │   ├── user.service.ts        # 用户服务
+│   │   └── notification.service.ts# 通知服务
+│   │
+│   ├── repositories/              # 数据访问层
+│   │   ├── canvas.repository.ts
+│   │   ├── auction.repository.ts
+│   │   ├── user.repository.ts
+│   │   └── wallet.repository.ts
+│   │
+│   ├── models/                    # 数据模型
+│   │   ├── user.ts
+│   │   ├── color-right.ts
+│   │   ├── auction.ts
+│   │   └── block.ts
+│   │
+│   ├── queues/                    # 任务队列
+│   │   ├── block-producer.ts      # 区块生成任务
+│   │   ├── auction-monitor.ts     # 拍卖到期监控
+│   │   └── notification-sender.ts # 通知发送
+│   │
+│   ├── middleware/                # 中间件
+│   │   ├── auth.middleware.ts     # JWT 验证
+│   │   ├── validation.middleware.ts
+│   │   └── error.middleware.ts
+│   │
+│   └── utils/                     # 工具函数
+│       ├── crypto.ts
+│       ├── pagination.ts
+│       └── logger.ts
+│
+├── prisma/                        # Prisma ORM
+│   ├── schema.prisma              # 数据库 Schema
+│   ├── migrations/                # 数据库迁移
+│   └── seed.ts                    # 种子数据
+│
+├── tests/                         # 测试
+│   ├── unit/                      # 单元测试
+│   ├── integration/               # 集成测试
+│   └── e2e/                       # 端到端测试
+│
+├── docker/
+│   ├── Dockerfile
+│   ├── docker-compose.yml
+│   └── k8s/                       # Kubernetes 配置
+│
+├── package.json
+├── tsconfig.json
+└── vitest.config.ts
+```
+
+### 2.3 核心代码示例
+
+**Fastify 应用入口：**
+```typescript
+// src/main.ts
+import Fastify from 'fastify';
+import cors from '@fastify/cors';
+import jwt from '@fastify/jwt';
+import websocket from '@fastify/websocket';
+import { config } from './config';
+
+import authRoutes from './routes/auth';
+import canvasRoutes from './routes/canvas';
+import auctionRoutes from './routes/auctions';
+import walletRoutes from './routes/wallet';
+
+const buildApp = async () => {
+  const fastify = Fastify({
+    logger: {
+      level: config.logLevel,
+    },
+  });
+
+  // 注册插件
+  await fastify.register(cors, { origin: true });
+  await fastify.register(jwt, { secret: config.jwtSecret });
+  await fastify.register(websocket);
+
+  // 注册路由
+  await fastify.register(authRoutes, { prefix: '/api/v1/auth' });
+  await fastify.register(canvasRoutes, { prefix: '/api/v1/canvas' });
+  await fastify.register(auctionRoutes, { prefix: '/api/v1/auctions' });
+  await fastify.register(walletRoutes, { prefix: '/api/v1/wallet' });
+
+  // 健康检查
+  fastify.get('/health', async () => ({ status: 'ok', timestamp: Date.now() }));
+
+  return fastify;
+};
+
+const start = async () => {
+  const fastify = await buildApp();
+  
+  try {
+    await fastify.listen({ port: config.port, host: '0.0.0.0' });
+    console.log(`Server running at http://localhost:${config.port}`);
+  } catch (err) {
+    fastify.log.error(err);
+    process.exit(1);
+  }
+};
+
+start();
+```
+
+**染色路由示例：**
+```typescript
+// src/routes/canvas/color.ts
+import { FastifyPluginAsync } from 'fastify';
+import { CanvasService } from '../../services/canvas.service';
+import { authMiddleware } from '../../middleware/auth.middleware';
+
+export const colorRoutes: FastifyPluginAsync = async (fastify) => {
+  fastify.post(
+    '/color',
+    {
+      preHandler: [authMiddleware],
+      schema: {
+        body: {
+          type: 'object',
+          required: ['x', 'y', 'color'],
+          properties: {
+            x: { type: 'integer', minimum: 0, maximum: 6999 },
+            y: { type: 'integer', minimum: 0, maximum: 2999 },
+            color: { type: 'integer', minimum: 0, maximum: 15 },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const { x, y, color } = request.body as { x: number; y: number; color: number };
+      const userId = request.user!.id;
+
+      // 验证染色权
+      const hasRight = await CanvasService.hasColorRight(userId, x, y);
+      if (!hasRight) {
+        return reply.status(403).send({ error: 'No color right' });
+      }
+
+      // 执行染色
+      await CanvasService.colorTile(x, y, color, userId);
+
+      // 广播更新
+      fastify.websocketServer.broadcastToZone(
+        CanvasService.getZone(x, y),
+        { type: 'tile_colored', x, y, color, timestamp: Date.now() }
+      );
+
+      return { success: true };
+    }
+  );
+};
+```
+
+**Prisma Schema：**
+```prisma
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  username  String   @unique
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  colorRights ColorRight[]
+  auctions    Auction[]
+  bids        AuctionBid[]
+}
+
+model ColorRight {
+  id          Int      @id @default(autoincrement())
+  x           Int
+  y           Int
+  zone        Int
+  ownerId     String
+  user        User     @relation(fields: [ownerId], references: [id])
+  isUsed      Boolean  @default(false)
+  usedAt      DateTime?
+  color       Int?
+  createdAt   DateTime @default(now())
+
+  @@unique([x, y])
+  @@index([zone])
+  @@index([ownerId])
+}
+
+model Auction {
+  id              String       @id @default(uuid())
+  colorRightId    Int
+  sellerId        String
+  type            AuctionType
+  price           BigInt
+  buyNowPrice     BigInt?
+  status          AuctionStatus @default(ACTIVE)
+  expiresAt       DateTime
+  createdAt       DateTime      @default(now())
+
+  colorRight      ColorRight   @relation(fields: [colorRightId], references: [id])
+  seller          User         @relation(fields: [sellerId], references: [id])
+  bids            AuctionBid[]
+}
+
+enum AuctionType {
+  FIXED_PRICE
+  BID
+}
+
+enum AuctionStatus {
+  ACTIVE
+  SOLD
+  EXPIRED
+  CANCELLED
+}
+```
+
+### 2.4 WebSocket 服务实现
+
+```typescript
+// src/services/websocket.service.ts
+import { FastifyInstance, FastifyRequest } from 'fastify';
+import { WebSocket } from 'ws';
+
+interface Client {
+  ws: WebSocket;
+  userId: string;
+  zones: Set<number>;
+}
+
+export class WebSocketService {
+  private clients: Map<string, Client> = new Map();
+  private zoneSubscribers: Map<number, Set<string>> = new Map();
+
+  constructor(private fastify: FastifyInstance) {}
+
+  async handleConnection(ws: WebSocket, request: FastifyRequest) {
+    const userId = request.user?.id;
+    if (!userId) {
+      ws.close(4001, 'Unauthorized');
+      return;
+    }
+
+    const clientId = this.generateClientId();
+    this.clients.set(clientId, { ws, userId, zones: new Set() });
+
+    ws.on('message', (data) => this.handleMessage(clientId, data));
+    ws.on('close', () => this.handleDisconnect(clientId));
+    ws.on('pong', () => this.clients.get(clientId)!.isAlive = true);
+
+    // 心跳检测
+    setInterval(() => {
+      const client = this.clients.get(clientId);
+      if (client && !client.isAlive) {
+        client.ws.terminate();
+      } else if (client) {
+        client.isAlive = false;
+        client.ws.ping();
+      }
+    }, 30000);
+  }
+
+  private handleMessage(clientId: string, data: Buffer) {
+    const message = JSON.parse(data.toString());
+    const client = this.clients.get(clientId);
+    if (!client) return;
+
+    switch (message.type) {
+      case 'subscribe_zone':
+        client.zones.add(message.payload.zone);
+        this.zoneSubscribers.get(message.payload.zone)?.add(clientId);
+        break;
+      case 'unsubscribe_zone':
+        client.zones.delete(message.payload.zone);
+        this.zoneSubscribers.get(message.payload.zone)?.delete(clientId);
+        break;
+    }
+  }
+
+  private handleDisconnect(clientId: string) {
+    const client = this.clients.get(clientId);
+    if (!client) return;
+
+    client.zones.forEach(zone => {
+      this.zoneSubscribers.get(zone)?.delete(clientId);
+    });
+    this.clients.delete(clientId);
+  }
+
+  broadcastToZone(zone: number, message: any) {
+    const subscribers = this.zoneSubscribers.get(zone);
+    if (!subscribers) return;
+
+    const data = JSON.stringify(message);
+    subscribers.forEach(clientId => {
+      const client = this.clients.get(clientId);
+      if (client && client.ws.readyState === WebSocket.OPEN) {
+        client.ws.send(data);
+      }
+    });
+  }
+
+  sendToUser(userId: string, message: any) {
+    const data = JSON.stringify(message);
+    this.clients.forEach((client, clientId) => {
+      if (client.userId === userId && client.ws.readyState === WebSocket.OPEN) {
+        client.ws.send(data);
+      }
+    });
+  }
+
+  private generateClientId(): string {
+    return `client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+}
+```
+
+### 2.5 任务队列 (BullMQ)
+
+```typescript
+// src/queues/block-producer.ts
+import { Queue, Worker } from 'bullmq';
+import { redisConfig } from '../config/redis';
+import { EconomyService } from '../services/economy.service';
+
+export class BlockProducerQueue {
+  private queue: Queue;
+  private worker: Worker;
+
+  constructor() {
+    this.queue = new Queue('block-production', { connection: redisConfig });
+    
+    this.worker = new Worker('block-production', async (job) => {
+      await this.produceBlock(job.data.blockNumber);
+    }, { connection: redisConfig });
+
+    // 每 10 分钟生成一个区块
+    this.startScheduler();
+  }
+
+  private async startScheduler() {
+    await this.queue.add(
+      'produce-block',
+      { blockNumber: 1 },
+      {
+        repeat: {
+          every: 10 * 60 * 1000, // 10 分钟
+        },
+      }
+    );
+  }
+
+  private async produceBlock(blockNumber: number) {
+    const reward = await EconomyService.calculateBlockReward(blockNumber);
+    const winners = await EconomyService.selectWinners(reward);
+    
+    await EconomyService.distributeRewards(blockNumber, winners);
+    
+    // 广播给所有用户
+    WebSocketService.broadcastGlobal({
+      type: 'block_generated',
+      payload: {
+        blockNumber,
+        reward,
+        winners,
+        timestamp: Date.now(),
+      },
+    });
+  }
+}
+```
+
+### 2.6 配置文件
+
+```typescript
+// src/config/index.ts
+export const config = {
+  port: process.env.PORT || 3000,
+  logLevel: process.env.LOG_LEVEL || 'info',
+  
+  database: {
+    url: process.env.DATABASE_URL!,
+  },
+  
+  redis: {
+    host: process.env.REDIS_HOST || 'localhost',
+    port: parseInt(process.env.REDIS_PORT || '6379'),
+  },
+  
+  jwt: {
+    secret: process.env.JWT_SECRET!,
+    expiresIn: '7d',
+  },
+  
+  canvas: {
+    width: 7000,
+    height: 3000,
+    totalTiles: 21000000,
+    zones: 21,
+  },
+  
+  season: {
+    miningDays: 49,
+    freeDays: 7,
+    frozenDays: 4,
+    halvingPeriodDays: 7,
+  },
+};
+```
+
+### 2.7 Docker 部署
+
+```dockerfile
+# docker/Dockerfile
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+COPY package*.json ./
+COPY prisma ./prisma/
+RUN npm ci
+
+COPY . .
+RUN npx prisma generate
+RUN npm run build
+
+FROM node:20-alpine AS runner
+
+WORKDIR /app
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/package.json ./
+
+ENV NODE_ENV=production
+
+EXPOSE 3000
+
+CMD ["node", "dist/main.js"]
+```
+
+```yaml
+# docker/docker-compose.yml
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@db:5432/bitcoinplace
+      - REDIS_HOST=redis
+      - JWT_SECRET=your-secret-key
+    depends_on:
+      - db
+      - redis
+
+  db:
+    image: postgres:15-alpine
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=bitcoinplace
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+
+volumes:
+  postgres_data:
+  redis_data:
+```
+
+---
+
+## 3. 核心模块设计
+
+### 3.1 画布服务 (CanvasService)
 
 **职责：**
 - 管理 7000×3000 画布的状态
