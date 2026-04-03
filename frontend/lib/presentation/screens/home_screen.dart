@@ -15,13 +15,12 @@ class HomeScreen extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.person),
             onPressed: () {
-              // TODO: 导航到个人中心
+              context.go('/profile');
             },
           ),
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () {
-              // TODO: 登出
               context.go('/login');
             },
           ),
@@ -105,9 +104,7 @@ class HomeScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 16),
             OutlinedButton.icon(
-              onPressed: () {
-                // TODO: 查看我的染色权
-              },
+              onPressed: () => context.go('/color-rights'),
               icon: const Icon(Icons.my_library_add),
               label: const Text('我的染色权'),
               style: OutlinedButton.styleFrom(

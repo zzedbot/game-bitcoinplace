@@ -5,6 +5,8 @@ import 'presentation/screens/home_screen.dart';
 import 'presentation/screens/login_screen.dart';
 import 'presentation/screens/register_screen.dart';
 import 'presentation/screens/canvas_screen.dart';
+import 'presentation/screens/profile_screen.dart';
+import 'presentation/screens/color_rights_screen.dart';
 
 /// 路由配置
 final GoRouter router = GoRouter(
@@ -29,6 +31,16 @@ final GoRouter router = GoRouter(
       path: '/canvas',
       name: 'canvas',
       builder: (context, state) => const CanvasScreen(),
+    ),
+    GoRoute(
+      path: '/profile',
+      name: 'profile',
+      builder: (context, state) => const ProfileScreen(),
+    ),
+    GoRoute(
+      path: '/color-rights',
+      name: 'colorRights',
+      builder: (context, state) => const ColorRightsScreen(),
     ),
   ],
 );
