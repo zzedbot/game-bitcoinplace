@@ -43,13 +43,15 @@ bitcoinplace/
 └── deploy/                # 部署配置（待创建）
 ```
 
-## 🛠️ 推荐技术栈
+## 🛠️ 技术栈
 
-| 模块 | 推荐方案 |
+| 模块 | 技术选型 |
 |---|---|
-| 前端 | React + TypeScript + Pixi.js |
-| 后端 | Node.js (Fastify) + WebSocket |
-| 数据库 | PostgreSQL + Redis |
+| 前端 | **Flutter 3.x** (Web/iOS/Android 三端统一) |
+| 后端 | **Node.js 20** + Fastify + TypeScript |
+| 数据库 | PostgreSQL + Redis + MongoDB |
+| ORM | Prisma v5 |
+| WebSocket | ws v8 |
 | CDN | Cloudflare |
 | 部署 | Docker + K8s |
 
