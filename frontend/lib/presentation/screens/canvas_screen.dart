@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../services/websocket_service.dart';
+import '../../services/http_service.dart';
+import '../../providers/app_providers.dart';
+
+export '../../services/websocket_service.dart' show WebSocketMessageType;
 
 /// 画布屏幕 - 主画布渲染和交互
 class CanvasScreen extends ConsumerStatefulWidget {
@@ -19,6 +24,14 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen> {
   // 选中的颜色
   int _selectedColor = 1;
 
+  // 染色状态
+  bool _isColoring = false;
+  String? _lastColorMessage;
+
+  // WebSocket 服务
+  WebSocketService? get _wsService => ref.read(webSocketServiceProvider);
+  HttpService? get _httpService => ref.read(httpServiceProvider);
+
   @override
   Widget build(BuildContext context) {
     final screenSize = MediaQuery.of(context).size;
@@ -33,6 +46,23 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen> {
       appBar: AppBar(
         title: const Text('BitcoinPlace'),
         actions: [
+          // WebSocket 连接状态
+          Builder(
+            builder: (context) {
+              final isConnected = _wsService?.isConnected ?? false;
+              return IconButton(
+                icon: Icon(
+                  isConnected ? Icons.wifi : Icons.wifi_off,
+                  color: isConnected ? Colors.green : Colors.red,
+                ),
+                onPressed: () {
+                  // TODO: 从认证状态获取 userId 和 token
+                  _wsService?.connect('test-user-id', 'test-token');
+                },
+                tooltip: isConnected ? 'WebSocket 已连接' : '点击连接 WebSocket',
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.zoom_out),
             onPressed: () {
@@ -122,6 +152,37 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen> {
               ),
             ),
           ),
+          
+          // 染色状态指示器
+          if (_isColoring)
+            Positioned(
+              left: 16,
+              bottom: 80,
+              child: Card(
+                color: Colors.greenAccent,
+                child: const Padding(
+                  padding: EdgeInsets.all(8.0),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.green),
+                        ),
+                      ),
+                      SizedBox(width: 8),
+                      Text(
+                        '染色中...',
+                        style: TextStyle(color: Colors.green, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -190,7 +251,7 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen> {
     return colors[index % colors.length];
   }
 
-  void _handleTap(Offset localPosition) {
+  void _handleTap(Offset localPosition) async {
     // 将屏幕坐标转换为画布坐标
     final canvasX = ((localPosition.dx - _offset.dx) / _scale).round();
     final canvasY = ((localPosition.dy - _offset.dy) / _scale).round();
@@ -200,17 +261,80 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen> {
         canvasX < 7000 &&
         canvasY >= 0 &&
         canvasY < 3000) {
-      // TODO: 执行染色操作
-      debugPrint('Tap at ($canvasX, $canvasY), color: $_selectedColor');
       
-      // 显示反馈
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('染色：($canvasX, $canvasY)'),
-          duration: const Duration(seconds: 1),
-        ),
-      );
+      // 检查是否有染色权
+      if (!_hasColorRight(canvasX, canvasY)) {
+        _showColorMessage('该区域需要染色权', isError: true);
+        return;
+      }
+
+      // 执行染色操作
+      setState(() {
+        _isColoring = true;
+      });
+
+      try {
+        // 通过 WebSocket 发送染色请求
+        final success = await _sendColorRequest(canvasX, canvasY, _selectedColor);
+        
+        if (success) {
+          _showColorMessage('染色成功：($canvasX, $canvasY)');
+        } else {
+          _showColorMessage('染色失败，请重试', isError: true);
+        }
+      } catch (e) {
+        _showColorMessage('网络错误：$e', isError: true);
+      } finally {
+        setState(() {
+          _isColoring = false;
+        });
+      }
     }
+  }
+
+  bool _hasColorRight(int x, int y) {
+    // TODO: 从本地缓存或服务器检查染色权
+    // 暂时返回 true 用于测试
+    return true;
+  }
+
+  Future<bool> _sendColorRequest(int x, int y, int color) async {
+    if (_wsService == null || !_wsService!.isConnected) {
+      // WebSocket 未连接，使用 HTTP fallback
+      debugPrint('WebSocket 未连接，使用 HTTP fallback');
+      // TODO: 实现 HTTP fallback
+      return false;
+    }
+
+    // 发送染色消息
+    final message = WebSocketMessage(
+      type: WebSocketMessageType.canvasUpdate,
+      payload: {
+        'action': 'color',
+        'x': x,
+        'y': y,
+        'color': color,
+      },
+      timestamp: DateTime.now(),
+    );
+
+    _wsService!.send(message);
+    debugPrint('发送染色请求：${message.payload}');
+    return true;
+  }
+
+  void _showColorMessage(String message, {bool isError = false}) {
+    setState(() {
+      _lastColorMessage = message;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        duration: const Duration(seconds: 2),
+        backgroundColor: isError ? Colors.red : Colors.green,
+      ),
+    );
   }
 }
 
