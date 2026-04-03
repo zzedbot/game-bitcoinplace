@@ -171,7 +171,7 @@ Response 200:
       "unlockedCount": 450000,
       "totalCount": 1000000,
       "unlockProgress": 0.45,
-      "floorPrice": 500,  // 地板价（Coin）
+      "floorPrice": 500,  // 地板价（PX/像素币）
       "avgPrice": 750
     },
     ...
@@ -322,7 +322,7 @@ Content-Type: application/json
 {
   "colorRightId": 12345,
   "type": "fixed_price",
-  "price": 5000,  // Coin
+  "price": 5000,  // PX (像素币)
   "currency": "game_coin",  // game_coin | gem
   "durationHours": 168  // 7 天
 }
@@ -492,7 +492,7 @@ Response 400 (出价过低):
 Response 400 (余额不足):
 {
   "error": "INSUFFICIENT_BALANCE",
-  "message": "You need 3600 Coin but only have 2000 Coin"
+  "message": "You need 3600 PX but only have 2000 PX"
 }
 ```
 

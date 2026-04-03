@@ -853,7 +853,7 @@ CREATE TABLE auctions (
   auction_type        auction_type NOT NULL,
   
   -- 定价
-  price               BIGINT NOT NULL,  -- 最小单位：聪或游戏币分
+  price               BIGINT NOT NULL,  -- 最小单位：像素币 (PX)
   currency            VARCHAR(10) DEFAULT 'game_coin',
   
   -- 竞价字段（仅 bid 类型）
