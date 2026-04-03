@@ -484,122 +484,520 @@ class WebSocketService {
 
 ---
 
-## 3. 前端架构
+## 3. 前端架构 (Flutter 跨平台)
 
 ### 3.1 技术选型
 
-```
-React 18 + TypeScript
-├── 状态管理：Zustand / Redux Toolkit
-├── 路由：React Router v6
-├── Canvas 渲染：Pixi.js (WebGL) 或 Konva.js
-├── UI 组件：shadcn/ui + Tailwind CSS
-├── WebSocket：socket.io-client
-├── 数据请求：TanStack Query (React Query)
-└── 构建工具：Vite
-```
-
-### 3.2 组件结构
+**为什么选择 Flutter？**
+- ✅ 一套代码编译 Web、iOS、Android 三端
+- ✅ Skia 引擎原生渲染，60fps 稳定性能
+- ✅ 三端 UI/UX 像素级一致
+- ✅ 热重载开发效率高
+- ✅ 2026 年生态成熟，Web 性能大幅提升
 
 ```
-src/
-├── components/
-│   ├── Canvas/
-│   │   ├── CanvasView.tsx        # 主画布组件
-│   │   ├── CanvasLayer.tsx       # 渲染层（Pixi）
-│   │   ├── TilePreview.tsx       # 坐标预览
-│   │   ├── ZoomControls.tsx      # 缩放控制
-│   │   └── Palette.tsx           # 调色板
-│   ├── Auction/
-│   │   ├── AuctionList.tsx       # 拍卖列表
-│   │   ├── AuctionDetail.tsx     # 拍卖详情
-│   │   ├── CreateAuction.tsx     # 创建拍卖
-│   │   └── BidPanel.tsx          # 竞价面板
-│   ├── User/
-│   │   ├── Wallet.tsx            # 钱包
-│   │   ├── Inventory.tsx         # 库存（染色权）
-│   │   └── Profile.tsx           # 个人资料
-│   └── common/
-│       ├── Header.tsx
-│       ├── Notification.tsx
-│       └── Loading.tsx
-├── hooks/
-│   ├── useCanvas.ts              # 画布逻辑
-│   ├── useWebSocket.ts           # WebSocket 连接
-│   └── useAuction.ts             # 拍卖逻辑
-├── stores/
-│   ├── canvasStore.ts            # 画布状态
-│   ├── userStore.ts              # 用户状态
-│   └── auctionStore.ts           # 拍卖状态
-└── services/
-    ├── api.ts                    # API 客户端
-    ├── websocket.ts              # WebSocket 客户端
-    └── utils.ts                  # 工具函数
+Flutter 3.x + Dart
+├── 状态管理：Riverpod 2.x
+├── 路由：go_router
+├── Canvas 渲染：CustomPainter + Skia
+├── UI 组件：Material 3 + 自定义主题
+├── WebSocket：web_socket_channel
+├── HTTP 客户端：dio
+├── 本地存储：hive (画布缓存) + flutter_secure_storage
+├── 代码生成：freezed + json_serializable
+└── 构建工具：flutter build (web/ios/android)
 ```
 
-### 3.3 画布渲染优化
+**pubspec.yaml 核心依赖：**
+```yaml
+name: bitcoinplace
+description: BitcoinPlace - Collaborative Canvas Game
+version: 1.0.0+1
 
-```typescript
-// 使用 Pixi.js 进行 WebGL 渲染
-import * as PIXI from 'pixi.js';
+environment:
+  sdk: '>=3.2.0 <4.0.0'
 
-class CanvasRenderer {
-  private app: PIXI.Application;
-  private tileGraphics: PIXI.Graphics;
-  private zoomLevel: number = 4;  // 4x 或 40x
-  private visibleRegion: Region;
+dependencies:
+  flutter:
+    sdk: flutter
 
-  constructor(container: HTMLElement) {
-    this.app = new PIXI.Application({
-      width: container.clientWidth,
-      height: container.clientHeight,
-      antialias: false,  // 像素艺术不需要抗锯齿
-      backgroundColor: 0x1a1a1a,
-    });
-    container.appendChild(this.app.view);
+  # 状态管理
+  flutter_riverpod: ^2.4.0
+  riverpod_annotation: ^2.3.0
 
-    this.tileGraphics = new PIXI.Graphics();
-    this.app.stage.addChild(this.tileGraphics);
-  }
+  # 网络
+  dio: ^5.3.0
+  web_socket_channel: ^2.4.0
 
-  // 渲染可见区域的瓦片
-  renderVisibleRegion(tiles: TileData[]) {
-    this.tileGraphics.clear();
+  # 本地存储
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+  flutter_secure_storage: ^9.0.0
 
-    const tileSize = this.zoomLevel;  // 4px 或 40px
-    const colors = this.getColorPalette();
+  # 路由
+  go_router: ^12.0.0
 
-    for (const tile of tiles) {
-      if (!this.isVisible(tile.x, tile.y)) continue;
-      if (tile.color === null) continue;  // 透明
+  # 动画
+  flutter_animate: ^4.3.0
 
-      this.tileGraphics.beginFill(colors[tile.color]);
-      this.tileGraphics.drawRect(
-        tile.x * tileSize,
-        tile.y * tileSize,
-        tileSize,
-        tileSize
-      );
-      this.tileGraphics.endFill();
+  # 工具
+  freezed_annotation: ^2.4.0
+  json_annotation: ^4.8.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  build_runner: ^2.4.0
+  freezed: ^2.4.0
+  json_serializable: ^6.7.0
+  riverpod_generator: ^2.3.0
+```
+
+### 3.2 项目结构
+
+```
+bitcoinplace/
+├── lib/
+│   ├── main.dart                    # 应用入口
+│   ├── core/
+│   │   ├── config/
+│   │   │   ├── app_config.dart      # 应用配置 (API 地址等)
+│   │   │   ├── season_config.dart   # 赛季配置 (60 天周期)
+│   │   │   └── theme_config.dart    # 主题配置
+│   │   ├── constants/
+│   │   │   ├── colors.dart          # 16 色调色板
+│   │   │   ├── dimensions.dart      # 尺寸常量
+│   │   │   └── api_endpoints.dart   # API 端点
+│   │   └── utils/
+│   │       ├── extensions.dart      # Dart 扩展
+│   │       ├── validators.dart      # 表单验证
+│   │       └── formatters.dart      # 格式化工具
+│   │
+│   ├── data/
+│   │   ├── models/                  # 数据模型
+│   │   │   ├── user.dart
+│   │   │   ├── color_right.dart
+│   │   │   ├── auction.dart
+│   │   │   ├── block.dart
+│   │   │   └── transaction.dart
+│   │   ├── repositories/            # 数据仓库
+│   │   │   ├── auth_repository.dart
+│   │   │   ├── canvas_repository.dart
+│   │   │   ├── auction_repository.dart
+│   │   │   └── wallet_repository.dart
+│   │   └── services/                # API 服务
+│   │       ├── api_client.dart      # Dio 封装
+│   │       ├── websocket_service.dart
+│   │       ├── auth_service.dart
+│   │       ├── canvas_service.dart
+│   │       ├── auction_service.dart
+│   │       └── wallet_service.dart
+│   │
+│   ├── domain/
+│   │   ├── entities/                # 领域模型
+│   │   │   ├── user_entity.dart
+│   │   │   ├── color_right_entity.dart
+│   │   │   └── auction_entity.dart
+│   │   └── use_cases/               # 业务逻辑
+│   │       ├── auth/
+│   │       ├── canvas/
+│   │       ├── auction/
+│   │       └── wallet/
+│   │
+│   ├── presentation/
+│   │   ├── providers/               # Riverpod 状态管理
+│   │   │   ├── auth_provider.dart
+│   │   │   ├── canvas_provider.dart
+│   │   │   ├── auction_provider.dart
+│   │   │   └── wallet_provider.dart
+│   │   │
+│   │   ├── screens/                 # 页面
+│   │   │   ├── splash/              # 启动页
+│   │   │   │   └── splash_screen.dart
+│   │   │   ├── auth/                # 认证
+│   │   │   │   ├── login_screen.dart
+│   │   │   │   └── register_screen.dart
+│   │   │   ├── home/                # 首页 (画布)
+│   │   │   │   ├── home_screen.dart
+│   │   │   │   └── canvas_screen.dart
+│   │   │   ├── auction/             # 拍卖行
+│   │   │   │   ├── auction_list_screen.dart
+│   │   │   │   ├── auction_detail_screen.dart
+│   │   │   │   └── create_auction_screen.dart
+│   │   │   ├── wallet/              # 钱包
+│   │   │   │   ├── wallet_screen.dart
+│   │   │   │   └── transaction_history_screen.dart
+│   │   │   ├── inventory/           # 库存 (染色权)
+│   │   │   │   └── inventory_screen.dart
+│   │   │   └── profile/             # 个人中心
+│   │   │       ├── profile_screen.dart
+│   │   │       └── settings_screen.dart
+│   │   │
+│   │   └── widgets/                 # 可复用组件
+│   │       ├── canvas/
+│   │       │   ├── bitcoin_place_canvas.dart    # 主画布组件
+│   │       │   ├── canvas_painter.dart          # CustomPainter
+│   │       │   ├── tile_preview.dart            # 坐标预览
+│   │       │   ├── zoom_controls.dart           # 缩放控制
+│   │       │   ├── palette_widget.dart          # 调色板
+│   │       │   └── zone_indicator.dart          # 矿区指示器
+│   │       ├── auction/
+│   │       │   ├── auction_card.dart
+│   │       │   ├── bid_panel.dart
+│   │       │   └── price_display.dart
+│   │       ├── common/
+│   │       │   ├── app_bar.dart
+│   │       │   ├── loading_overlay.dart
+│   │       │   ├── error_widget.dart
+│   │       │   └── empty_state.dart
+│   │       └── wallet/
+│   │           ├── balance_card.dart
+│   │           └── transaction_tile.dart
+│   │
+│   └── platform/                      # 平台特定代码
+│       ├── web/
+│       │   └── web_config.dart        # Web 优化配置
+│       ├── mobile/
+│       │   └── mobile_config.dart     # 移动端优化
+│       └── desktop/
+│           └── desktop_config.dart    # 桌面端 (可选)
+│
+├── assets/
+│   ├── images/                        # 图片资源
+│   ├── fonts/                         # 字体
+│   └── icons/                         # 图标
+│
+├── test/                              # 单元测试
+├── integration_test/                  # 集成测试
+└── pubspec.yaml
+```
+
+### 3.3 画布渲染核心实现
+
+**CustomPainter 渲染 7000×3000 画布：**
+
+```dart
+import 'package:flutter/material.dart';
+import '../core/constants/colors.dart';
+
+/// 画布数据模型
+class TileData {
+  final int x;
+  final int y;
+  final int? colorIndex;  // null = 透明
+  
+  const TileData({
+    required this.x,
+    required this.y,
+    this.colorIndex,
+  });
+}
+
+/// 画布 CustomPainter
+class CanvasPainter extends CustomPainter {
+  final Map<Point, int> tiles;  // 坐标 → 颜色索引
+  final double zoomLevel;
+  final Rect visibleRegion;
+  
+  CanvasPainter({
+    required this.tiles,
+    required this.zoomLevel,
+    required this.visibleRegion,
+  });
+  
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint();
+    final tileSize = zoomLevel;
+    
+    // 只渲染可见区域
+    final startX = (visibleRegion.left / tileSize).floor();
+    final startY = (visibleRegion.top / tileSize).floor();
+    final endX = ((visibleRegion.right) / tileSize).ceil();
+    final endY = ((visibleRegion.bottom) / tileSize).ceil();
+    
+    for (int x = startX; x < endX; x++) {
+      for (int y = startY; y < endY; y++) {
+        final point = Point(x, y);
+        final colorIndex = tiles[point];
+        
+        if (colorIndex == null) continue;  // 透明
+        
+        paint.color = AppColors.palette[colorIndex];
+        canvas.drawRect(
+          Rect.fromLTWH(
+            x * tileSize,
+            y * tileSize,
+            tileSize,
+            tileSize,
+          ),
+          paint,
+        );
+      }
     }
   }
+  
+  @override
+  bool shouldRepaint(CanvasPainter old) {
+    return old.zoomLevel != zoomLevel || 
+           old.visibleRegion != visibleRegion ||
+           old.tiles.length != tiles.length;
+  }
+}
 
-  // 批量更新（用于 WebSocket 推送的增量变化）
-  batchUpdateTileChanges(changes: TileChange[]) {
-    requestAnimationFrame(() => {
-      for (const change of changes) {
-        this.renderSingleTile(change.x, change.y, change.color);
+/// 画布组件 (支持缩放、平移)
+class BitcoinPlaceCanvas extends ConsumerStatefulWidget {
+  const BitcoinPlaceCanvas({Key? key}) : super(key: key);
+
+  @override
+  ConsumerState<BitcoinPlaceCanvas> createState() => _BitcoinPlaceCanvasState();
+}
+
+class _BitcoinPlaceCanvasState extends ConsumerState<BitcoinPlaceCanvas> {
+  double _zoomLevel = 4.0;  // 4x 查看 / 40x 染色
+  Offset _offset = Offset.zero;
+  bool _isPanning = false;
+  Offset _lastPanPosition = Offset.zero;
+  
+  // 画布尺寸
+  static const double canvasWidth = 7000.0;
+  static const double canvasHeight = 3000.0;
+  
+  @override
+  Widget build(BuildContext context) {
+    final canvasState = ref.watch(canvasProvider);
+    final tiles = canvasState.tiles;
+    
+    return GestureDetector(
+      // 缩放手势
+      onScaleUpdate: _handleScaleUpdate,
+      // 拖拽手势
+      onPanStart: _handlePanStart,
+      onPanUpdate: _handlePanUpdate,
+      onPanEnd: _handlePanEnd,
+      // 点击染色
+      onTapUp: _handleTap,
+      
+      child: ClipRect(
+        child: Container(
+          color: const Color(0xFF1a1a1a),
+          child: Transform(
+            transform: Matrix4.identity()
+              ..translate(_offset.dx, _offset.dy)
+              ..scale(_zoomLevel),
+            child: RepaintBoundary(  // 性能优化：离屏渲染
+              child: CustomPaint(
+                size: const Size(canvasWidth, canvasHeight),
+                painter: CanvasPainter(
+                  tiles: tiles,
+                  zoomLevel: _zoomLevel,
+                  visibleRegion: _calculateVisibleRegion(),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+  
+  void _handleScaleUpdate(ScaleUpdateDetails details) {
+    setState(() {
+      // 限制缩放范围：1x - 40x
+      _zoomLevel = (_zoomLevel * details.scale).clamp(1.0, 40.0);
+    });
+  }
+  
+  void _handlePanStart(DragStartDetails details) {
+    _isPanning = true;
+    _lastPanPosition = details.globalPosition;
+  }
+  
+  void _handlePanUpdate(DragUpdateDetails details) {
+    if (!_isPanning) return;
+    
+    setState(() {
+      _offset += details.globalPosition - _lastPanPosition;
+      _lastPanPosition = details.globalPosition;
+    });
+  }
+  
+  void _handlePanEnd(DragEndDetails details) {
+    _isPanning = false;
+  }
+  
+  void _handleTap(TapUpDetails details) {
+    // 计算点击的坐标
+    final renderBox = context.findRenderObject() as RenderBox;
+    final localPosition = renderBox.globalToLocal(details.globalPosition);
+    
+    final x = ((localPosition.dx - _offset.dx) / _zoomLevel).floor();
+    final y = ((localPosition.dy - _offset.dy) / _zoomLevel).floor();
+    
+    if (x >= 0 && x < canvasWidth && y >= 0 && y < canvasHeight) {
+      _handleTileTap(x, y);
+    }
+  }
+  
+  void _handleTileTap(int x, int y) {
+    // 打开染色对话框或预览
+    ref.read(canvasProvider.notifier).selectTile(x, y);
+  }
+  
+  Rect _calculateVisibleRegion() {
+    final screenSize = MediaQuery.of(context).size;
+    return Rect.fromLTWH(
+      -_offset.dx / _zoomLevel,
+      -_offset.dy / _zoomLevel,
+      screenSize.width / _zoomLevel,
+      screenSize.height / _zoomLevel,
+    );
+  }
+}
+```
+
+### 3.4 性能优化策略
+
+**1. 分块加载 (Lazy Loading)**
+```dart
+class CanvasRepository {
+  final CanvasService _service;
+  final Box<Map<Point, int>> _cache;  // Hive 本地缓存
+  
+  // 只加载可见区域的瓦片
+  Future<void> loadVisibleRegion(Rect region) async {
+    final zone = _getZoneForRegion(region);
+    final data = await _service.getRegion(
+      zone: zone,
+      minX: region.left.floor(),
+      minY: region.top.floor(),
+      maxX: region.right.ceil(),
+      maxY: region.bottom.ceil(),
+    );
+    
+    // 合并到缓存
+    await _cache.put(zone, data.tiles);
+  }
+}
+```
+
+**2. WebSocket 增量更新**
+```dart
+class CanvasProvider extends StateNotifier<CanvasState> {
+  final WebSocketService _ws;
+  
+  CanvasProvider() : super(CanvasState.initial()) {
+    _ws.listen((message) {
+      switch (message.type) {
+        case 'tile_colored':
+          _handleTileColored(message.payload);
+          break;
+        case 'block_generated':
+          _handleBlockGenerated(message.payload);
+          break;
       }
     });
   }
-
-  // 分块加载策略
-  async loadRegion(zone: number, bounds: Bounds) {
-    const response = await fetch(`/api/v1/canvas/region?zone=${zone}&...`);
-    const data = await response.json();
-    this.renderVisibleRegion(data.tiles);
+  
+  void _handleTileColored(TileColoredPayload payload) {
+    state = state.copyWith(
+      tiles: {
+        ...state.tiles,
+        Point(payload.x, payload.y): payload.color,
+      },
+      version: payload.version,
+    );
   }
 }
+```
+
+**3. 本地缓存策略**
+```dart
+// Hive 存储画布快照
+@HiveType(typeId: 0)
+class CanvasSnapshot extends HiveObject {
+  @HiveField(0)
+  int version;
+  
+  @HiveField(1)
+  Map<String, int> tiles;  // "x,y" → colorIndex
+  
+  @HiveField(2)
+  DateTime cachedAt;
+  
+  bool get isStale => 
+    DateTime.now().difference(cachedAt).inSeconds > 60;
+}
+
+// 启动时加载缓存
+Future<CanvasSnapshot?> loadCachedCanvas() async {
+  final box = await Hive.openBox<CanvasSnapshot>('canvas_cache');
+  return box.get('latest');
+}
+```
+
+### 3.5 三端适配策略
+
+**Web 端优化：**
+```dart
+// web/web_config.dart
+import 'dart:html' as html;
+
+class WebConfig {
+  static void init() {
+    // 设置 CanvasKit  CDN
+    html.document.querySelector('script')?.setAttribute(
+      'src',
+      'https://www.gstatic.com/flutter-canvaskit/0.0.0/canvaskit.js',
+    );
+    
+    // 启用 Service Worker
+    if ('serviceWorker' in html.window.navigator) {
+      html.window.navigator.serviceWorker?.register('flutter_service_worker.js');
+    }
+  }
+}
+```
+
+**移动端优化：**
+```dart
+// mobile/mobile_config.dart
+import 'package:flutter/services.dart';
+
+class MobileConfig {
+  static void init() {
+    // 隐藏状态栏
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    
+    // 锁定方向
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
+  }
+}
+```
+
+### 3.6 构建命令
+
+```bash
+# Web 发布
+flutter build web --release --web-renderer canvaskit
+
+# iOS 发布
+flutter build ios --release
+
+# Android 发布
+flutter build apk --release
+# 或 App Bundle
+flutter build appbundle --release
+
+# 分析包体积
+flutter build apk --analyze-size
+
+# 性能分析
+flutter run --profile
 ```
 
 ---
