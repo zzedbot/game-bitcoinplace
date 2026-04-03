@@ -1,8 +1,7 @@
 import { FastifyPluginAsync } from 'fastify';
 import { UserService, CreateUserDTO } from '../services/UserService';
-import { prisma } from '../index';
-
-const userService = new UserService(prisma);
+import { prisma, userService, redis } from '../index';
+import { deviceService } from '../services/DeviceService';
 
 interface RegisterBody {
   email: string;
@@ -42,6 +41,9 @@ const authRoutes: FastifyPluginAsync = async (app) => {
     }
 
     try {
+      const deviceInfo = deviceService.extractDeviceInfo(request.headers);
+      const deviceId = deviceService.generateDeviceId();
+
       const user = await userService.createUser({
         email: body.email,
         username: body.username,
@@ -49,7 +51,17 @@ const authRoutes: FastifyPluginAsync = async (app) => {
       });
 
       // 生成 JWT Token
-      const token = app.jwt.sign({ userId: user.id, email: user.email });
+      const token = app.jwt.sign({ userId: user.id, email: user.email, deviceId });
+
+      // 在 Redis 中存储设备指纹
+      const fingerprint = deviceService.generateFingerprint(
+        deviceInfo.userAgent,
+        deviceInfo.ip
+      );
+      await redis.setex(`device:${deviceId}`, 86400 * 30, fingerprint); // 30 天
+
+      // 更新最后登录时间
+      await userService.updateLastLogin(user.id);
 
       return reply.status(201).send({
         user: {
@@ -58,7 +70,8 @@ const authRoutes: FastifyPluginAsync = async (app) => {
           username: user.username,
           avatar: user.avatar
         },
-        token
+        token,
+        deviceId
       });
     } catch (error: any) {
       if (error.message === 'Email already exists' || error.message === 'Username already exists') {
@@ -110,8 +123,21 @@ const authRoutes: FastifyPluginAsync = async (app) => {
       });
     }
 
+    const deviceInfo = deviceService.extractDeviceInfo(request.headers);
+    const deviceId = deviceService.generateDeviceId();
+
     // 生成 JWT Token
-    const token = app.jwt.sign({ userId: user.id, email: user.email });
+    const token = app.jwt.sign({ userId: user.id, email: user.email, deviceId });
+
+    // 在 Redis 中存储设备指纹
+    const fingerprint = deviceService.generateFingerprint(
+      deviceInfo.userAgent,
+      deviceInfo.ip
+    );
+    await redis.setex(`device:${deviceId}`, 86400 * 30, fingerprint);
+
+    // 更新最后登录时间
+    await userService.updateLastLogin(user.id);
 
     return reply.send({
       user: {
@@ -120,7 +146,8 @@ const authRoutes: FastifyPluginAsync = async (app) => {
         username: user.username,
         avatar: user.avatar
       },
-      token
+      token,
+      deviceId
     });
   });
 

@@ -4,9 +4,12 @@ import helmet from '@fastify/helmet';
 import jwt from '@fastify/jwt';
 import { PrismaClient } from '@prisma/client';
 import { UserService } from './services/UserService';
+import { getRedis, disconnectRedis } from './db/redis';
+import { deviceService } from './services/DeviceService';
 
 const prisma = new PrismaClient();
 const userService = new UserService(prisma);
+const redis = getRedis();
 
 const buildApp = async (): Promise<FastifyInstance> => {
   const app = Fastify({
@@ -71,6 +74,7 @@ const start = async () => {
 const gracefulShutdown = async (signal: string) => {
   console.log(`\n${signal} received. Shutting down gracefully...`);
   await prisma.$disconnect();
+  await disconnectRedis();
   process.exit(0);
 };
 

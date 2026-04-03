@@ -12,14 +12,15 @@ datasource db {
 
 /// User 表 - 用户账户
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  username  String   @unique
-  password  String   // bcrypt hashed
-  avatar    String?  // 头像 URL
-  balance   BigInt   @default(0) // 像素币余额 (最小单位：PX)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(uuid())
+  email       String   @unique
+  username    String   @unique
+  password    String   // bcrypt hashed
+  avatar      String?  // 头像 URL
+  balance     BigInt   @default(0) // 像素币余额 (最小单位：PX)
+  lastLoginAt DateTime? // 最后登录时间
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
   
   // 关联
   colorRights ColorRight[]

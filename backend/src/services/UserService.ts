@@ -30,7 +30,7 @@ export class UserService {
     }
 
     // 检查用户名是否已存在
-    const existingUsername = await this.prisma.user.findUnique({
+    const existingUsername = await this.prisma.user.findFirst({
       where: { username: data.username }
     });
 
@@ -104,6 +104,16 @@ export class UserService {
     return this.prisma.user.update({
       where: { id: userId },
       data: { balance }
+    });
+  }
+
+  /**
+   * 更新最后登录时间
+   */
+  async updateLastLogin(userId: string): Promise<void> {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { lastLoginAt: new Date() }
     });
   }
 }
