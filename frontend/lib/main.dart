@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'services/cache_service.dart';
 import 'presentation/screens/home_screen.dart';
 import 'presentation/screens/login_screen.dart';
 import 'presentation/screens/register_screen.dart';
@@ -54,10 +55,10 @@ final GoRouter router = GoRouter(
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // TODO: 初始化 Hive 本地缓存
-  // await Hive.initFlutter();
-  // await Hive.openBox(AppConfig.boxUser);
-  // await Hive.openBox(AppConfig.boxToken);
+  // 初始化 Hive 本地缓存 (FE-3.8)
+  debugPrint('Initializing CacheService with Hive...');
+  await CacheService().initialize();
+  debugPrint('CacheService initialized successfully');
   
   runApp(
     const ProviderScope(

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../services/websocket_service.dart';
 import '../../services/http_service.dart';
+import '../../services/color_right_service.dart';
 import '../../providers/app_providers.dart';
 
 export '../../services/websocket_service.dart' show WebSocketMessageType;
@@ -263,7 +264,8 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen> {
         canvasY < 3000) {
       
       // 检查是否有染色权
-      if (!_hasColorRight(canvasX, canvasY)) {
+      final hasRight = await _hasColorRight(canvasX, canvasY);
+      if (!hasRight) {
         _showColorMessage('该区域需要染色权', isError: true);
         return;
       }
@@ -292,10 +294,14 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen> {
     }
   }
 
-  bool _hasColorRight(int x, int y) {
-    // TODO: 从本地缓存或服务器检查染色权
-    // 暂时返回 true 用于测试
-    return true;
+  Future<bool> _hasColorRight(int x, int y) async {
+    try {
+      final colorRightService = ref.read(colorRightServiceProvider);
+      return await colorRightService.hasColorRight(x, y);
+    } catch (e) {
+      // 服务未初始化或错误时，返回 false
+      return false;
+    }
   }
 
   Future<bool> _sendColorRequest(int x, int y, int color) async {

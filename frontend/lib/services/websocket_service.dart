@@ -25,12 +25,13 @@ class WebSocketMessage {
   });
 
   factory WebSocketMessage.fromJson(Map<String, dynamic> json) {
+    final payload = (json['payload'] as Map).cast<String, dynamic>();
     return WebSocketMessage(
       type: WebSocketMessageType.values.firstWhere(
         (e) => e.name == json['type'],
         orElse: () => WebSocketMessageType.error,
       ),
-      payload: json['payload'] as Map<String, dynamic>,
+      payload: payload,
       timestamp: DateTime.fromMillisecondsSinceEpoch(json['timestamp'] as int),
     );
   }
@@ -128,7 +129,9 @@ class WebSocketService {
     _channel = null;
     _subscription = null;
     _isConnected = false;
-    _statusController.add(false);
+    if (!_statusController.isClosed) {
+      _statusController.add(false);
+    }
   }
 
   /// 发送消息
@@ -164,6 +167,45 @@ class WebSocketService {
   void close() {
     _messageController.close();
     _statusController.close();
+  }
+
+  // ==================== 测试支持方法 ====================
+
+  /// 模拟连接状态（用于测试）
+  void mockConnection(bool connected) {
+    _isConnected = connected;
+    if (!_statusController.isClosed) {
+      _statusController.add(connected);
+    }
+  }
+
+  /// 发送模拟消息（用于测试）
+  void sendMockMessage(WebSocketMessage message) {
+    if (!_messageController.isClosed) {
+      _messageController.add(message);
+    }
+  }
+
+  /// 重置服务状态（用于测试）
+  void resetForTest() {
+    _isConnected = false;
+    _userId = null;
+    _token = null;
+    _channel = null;
+    _subscription = null;
+  }
+
+  /// 获取内部状态（用于测试）
+  Map<String, dynamic> getTestState() {
+    return {
+      'isConnected': _isConnected,
+      'userId': _userId,
+      'token': _token,
+      'hasChannel': _channel != null,
+      'hasSubscription': _subscription != null,
+      'messageControllerClosed': _messageController.isClosed,
+      'statusControllerClosed': _statusController.isClosed,
+    };
   }
 }
 
