@@ -1,0 +1,53 @@
+# Dependencies
+node_modules/
+.dart_tool/
+.flutter-plugins
+.packages
+.pub-cache/
+.pub/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+.env.production
+
+# Build outputs
+**/build/
+**/dist/
+**/out/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Testing
+coverage/
+.dart_tool/build/
+
+# Flutter
+flutter/flutter/
+*.lock
+
+# Database
+*.db
+*.sqlite
+
+# Temporary files
+tmp/
+temp/
+.tmp/

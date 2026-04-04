@@ -53,12 +53,16 @@ const authRoutes: FastifyPluginAsync = async (app) => {
       // 生成 JWT Token
       const token = app.jwt.sign({ userId: user.id, email: user.email, deviceId });
 
-      // 在 Redis 中存储设备指纹
+      // 在 Redis 中存储设备指纹 (Redis 可选)
       const fingerprint = deviceService.generateFingerprint(
         deviceInfo.userAgent,
         deviceInfo.ip
       );
-      await redis.setex(`device:${deviceId}`, 86400 * 30, fingerprint); // 30 天
+      try {
+        await redis.setex(`device:${deviceId}`, 86400 * 30, fingerprint);
+      } catch (e) {
+        console.log('Redis unavailable, skipping device fingerprint storage');
+      }
 
       // 更新最后登录时间
       await userService.updateLastLogin(user.id);
@@ -129,12 +133,16 @@ const authRoutes: FastifyPluginAsync = async (app) => {
     // 生成 JWT Token
     const token = app.jwt.sign({ userId: user.id, email: user.email, deviceId });
 
-    // 在 Redis 中存储设备指纹
+    // 在 Redis 中存储设备指纹 (Redis 可选)
     const fingerprint = deviceService.generateFingerprint(
       deviceInfo.userAgent,
       deviceInfo.ip
     );
-    await redis.setex(`device:${deviceId}`, 86400 * 30, fingerprint);
+    try {
+      await redis.setex(`device:${deviceId}`, 86400 * 30, fingerprint);
+    } catch (e) {
+      console.log('Redis unavailable, skipping device fingerprint storage');
+    }
 
     // 更新最后登录时间
     await userService.updateLastLogin(user.id);

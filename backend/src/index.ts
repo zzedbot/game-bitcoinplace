@@ -67,8 +67,8 @@ const start = async () => {
     const server = await app.listen({ port, host });
     console.log(`🚀 Server running at http://${host}:${port}`);
     
-    // 初始化 WebSocket
-    webSocketService.initialize(server);
+    // 初始化 WebSocket (暂时禁用)
+    // webSocketService.initialize(server.server);
   } catch (err) {
     app.log.error(err);
     process.exit(1);
@@ -91,4 +91,4 @@ if (require.main === module) {
   start();
 }
 
-export { buildApp, prisma, userService };
+export { buildApp, prisma, userService, redis };

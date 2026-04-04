@@ -5,6 +5,7 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     include: ['src/**/*.test.ts', 'tests/**/*.test.ts'],
+    exclude: ['tests/load/*-load.test.ts'], // K6 tests run with 'k6 run' command
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],

@@ -7,7 +7,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  url      = "postgresql://postgres:iJuP4ni1xdxnyvv1@localhost:5432/game_bitcoinplace?schema=public"
 }
 
 /// User 表 - 用户账户
@@ -22,11 +22,7 @@ model User {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   
-  // 关联
-  colorRights ColorRight[]
-  auctions    Auction[]
-  bids        Bid[]
-  transactions Transaction[]
+  // 注意：外键约束已移除，应用层维护数据一致性
   
   @@index([email])
   @@index([username])
@@ -36,7 +32,7 @@ model User {
 /// ColorRight 表 - 染色权
 model ColorRight {
   id        String   @id @default(uuid())
-  userId    String
+  userId    String   // 外键字段保留，但无数据库约束
   x         Int      // 坐标 X (0-6999)
   y         Int      // 坐标 Y (0-2999)
   zoneIndex Int      // 矿区索引 (0-20)
@@ -45,9 +41,7 @@ model ColorRight {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   
-  // 关联
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  auction Auction?
+  // 注意：外键约束已移除，应用层维护数据一致性
   
   @@unique([x, y]) // 每个坐标只能有一个染色权
   @@index([userId])
@@ -58,23 +52,20 @@ model ColorRight {
 
 /// Auction 表 - 拍卖
 model Auction {
-  id          String      @id @default(uuid())
-  sellerId    String
-  colorRightId String      @unique
+  id           String      @id @default(uuid())
+  sellerId     String      // 外键字段保留，但无数据库约束
+  colorRightId String      @unique // 外键字段保留，但无数据库约束
   startingPrice BigInt
   currentPrice BigInt
-  buyNowPrice BigInt?     // 一口价
-  status      AuctionStatus @default(ACTIVE)
-  startTime   DateTime   @default(now())
-  endTime     DateTime
-  winnerId    String?
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  buyNowPrice  BigInt?     // 一口价
+  status       AuctionStatus @default(ACTIVE)
+  startTime    DateTime    @default(now())
+  endTime      DateTime
+  winnerId     String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
   
-  // 关联
-  seller     User         @relation(fields: [sellerId], references: [id])
-  colorRight ColorRight   @relation(fields: [colorRightId], references: [id])
-  bids       Bid[]
+  // 注意：外键约束已移除，应用层维护数据一致性
   
   @@index([sellerId])
   @@index([status])
@@ -92,14 +83,12 @@ enum AuctionStatus {
 /// Bid 表 - 竞价
 model Bid {
   id        String   @id @default(uuid())
-  auctionId String
-  bidderId  String
+  auctionId String   // 外键字段保留，但无数据库约束
+  bidderId  String   // 外键字段保留，但无数据库约束
   amount    BigInt
   createdAt DateTime @default(now())
   
-  // 关联
-  auction Auction @relation(fields: [auctionId], references: [id], onDelete: Cascade)
-  bidder  User    @relation(fields: [bidderId], references: [id])
+  // 注意：外键约束已移除，应用层维护数据一致性
   
   @@index([auctionId])
   @@index([bidderId])
@@ -109,15 +98,14 @@ model Bid {
 /// Transaction 表 - 交易记录
 model Transaction {
   id        String         @id @default(uuid())
-  userId    String
+  userId    String         // 外键字段保留，但无数据库约束
   type      TransactionType
   amount    BigInt
   balance   BigInt         // 交易后余额
   reference String?        // 关联 ID (拍卖 ID 等)
   createdAt DateTime       @default(now())
   
-  // 关联
-  user User @relation(fields: [userId], references: [id])
+  // 注意：外键约束已移除，应用层维护数据一致性
   
   @@index([userId])
   @@index([type])

@@ -1,5 +1,31 @@
 # BitcoinPlace - 技术架构设计
 
+## 0. 数据库设计原则
+
+**核心规范（2026-04-04 更新）：**
+
+| 特性 | 状态 | 说明 |
+|------|------|------|
+| **外键约束** | ❌ 禁止使用 | 不使用 `REFERENCES` 或 Prisma `@relation` 外键约束 |
+| **触发器** | ❌ 禁止使用 | 业务逻辑全部在应用层实现 |
+| **存储过程** | ❌ 禁止使用 | 所有查询通过 Prisma ORM 执行 |
+
+**原因：**
+1. 微服务友好 - 无外键便于未来拆分服务
+2. 迁移简单 - 数据库重置和迁移更灵活
+3. 测试便利 - 单元测试无需考虑外键依赖
+4. 性能可控 - 应用层批量操作比数据库级联更高效
+5. 代码集中 - 业务逻辑集中在代码层，便于审查和维护
+
+**应用层责任：**
+- 使用 `prisma.$transaction()` 保证数据一致性
+- 手动实现级联删除/更新逻辑
+- 应用层验证外键引用存在
+
+详细规范见：`docs/DATABASE_GUIDELINES.md`
+
+---
+
 ## 1. 系统架构总览
 
 ```
@@ -312,55 +338,97 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  username  String   @unique
-  password  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+// 数据库规范：不使用外键约束、触发器、存储过程
+// 所有表间关系由应用层维护，Prisma 仅保留字段用于查询
 
-  colorRights ColorRight[]
-  auctions    Auction[]
-  bids        AuctionBid[]
+model User {
+  id          String   @id @default(uuid())
+  email       String   @unique
+  username    String   @unique
+  password    String
+  avatar      String?
+  balance     BigInt   @default(0)
+  lastLoginAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // 注意：移除外键关系定义，应用层维护数据一致性
+  
+  @@index([email])
+  @@index([username])
+  @@map("users")
 }
 
 model ColorRight {
-  id          Int      @id @default(autoincrement())
-  x           Int
-  y           Int
-  zone        Int
-  ownerId     String
-  user        User     @relation(fields: [ownerId], references: [id])
-  isUsed      Boolean  @default(false)
-  usedAt      DateTime?
-  color       Int?
-  createdAt   DateTime @default(now())
+  id        String   @id @default(uuid())
+  userId    String   // 外键字段保留，但无数据库约束
+  x         Int
+  y         Int
+  zoneIndex Int
+  color     Int?
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
+  // 注意：外键约束已移除
+  
   @@unique([x, y])
-  @@index([zone])
-  @@index([ownerId])
+  @@index([userId])
+  @@index([zoneIndex])
+  @@index([used])
+  @@map("color_rights")
 }
 
 model Auction {
-  id              String       @id @default(uuid())
-  colorRightId    Int
-  sellerId        String
-  type            AuctionType
-  price           BigInt
-  buyNowPrice     BigInt?
-  status          AuctionStatus @default(ACTIVE)
-  expiresAt       DateTime
-  createdAt       DateTime      @default(now())
+  id           String        @id @default(uuid())
+  sellerId     String        // 外键字段保留，但无数据库约束
+  colorRightId String        @unique // 外键字段保留，但无数据库约束
+  startingPrice BigInt
+  currentPrice BigInt
+  buyNowPrice  BigInt?
+  status       AuctionStatus @default(ACTIVE)
+  startTime    DateTime      @default(now())
+  endTime      DateTime
+  winnerId     String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
 
-  colorRight      ColorRight   @relation(fields: [colorRightId], references: [id])
-  seller          User         @relation(fields: [sellerId], references: [id])
-  bids            AuctionBid[]
+  // 注意：外键约束已移除
+  
+  @@index([sellerId])
+  @@index([status])
+  @@index([endTime])
+  @@map("auctions")
 }
 
-enum AuctionType {
-  FIXED_PRICE
-  BID
+model Bid {
+  id        String   @id @default(uuid())
+  auctionId String   // 外键字段保留，但无数据库约束
+  bidderId  String   // 外键字段保留，但无数据库约束
+  amount    BigInt
+  createdAt DateTime @default(now())
+
+  // 注意：外键约束已移除
+  
+  @@index([auctionId])
+  @@index([bidderId])
+  @@map("bids")
+}
+
+model Transaction {
+  id        String         @id @default(uuid())
+  userId    String         // 外键字段保留，但无数据库约束
+  type      TransactionType
+  amount    BigInt
+  balance   BigInt
+  reference String?
+  createdAt DateTime       @default(now())
+
+  // 注意：外键约束已移除
+  
+  @@index([userId])
+  @@index([type])
+  @@map("transactions")
 }
 
 enum AuctionStatus {
@@ -368,6 +436,16 @@ enum AuctionStatus {
   SOLD
   EXPIRED
   CANCELLED
+}
+
+enum TransactionType {
+  DEPOSIT
+  WITHDRAW
+  REWARD
+  PURCHASE
+  SALE
+  AUCTION_WIN
+  FEE
 }
 ```
 
@@ -663,26 +741,26 @@ BITFIELD canvas:state SET u8 {offset} {value}
 
 ```sql
 -- PostgreSQL 存储染色权所有权
+-- 注意：不使用外键约束，应用层维护数据一致性
 CREATE TABLE color_rights (
-    id              BIGSERIAL PRIMARY KEY,
-    user_id         UUID NOT NULL,
-    x               INT NOT NULL CHECK (x >= 0 AND x < 7000),
-    y               INT NOT NULL CHECK (y >= 0 AND y < 3000),
-    zone            INT NOT NULL CHECK (zone >= 1 AND zone <= 21),
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id         UUID NOT NULL,  -- 外键字段，但无数据库约束
+    x               INT NOT NULL,
+    y               INT NOT NULL,
+    zone_index      INT NOT NULL,
     
-    is_used         BOOLEAN DEFAULT FALSE,
-    current_color   INT CHECK (current_color >= 0 AND current_color < 16),
+    used            BOOLEAN DEFAULT FALSE,
+    color           INT,  -- 当前颜色 (0-15), null=未使用
     
-    acquired_at     TIMESTAMPTZ DEFAULT NOW(),
-    used_at         TIMESTAMPTZ,
-    last_modified_at TIMESTAMPTZ,
+    created_at      TIMESTAMPTZ DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ,
     
     UNIQUE (x, y)
 );
 
 CREATE INDEX idx_color_rights_user ON color_rights(user_id);
-CREATE INDEX idx_color_rights_zone ON color_rights(zone, is_used);
-CREATE INDEX idx_color_rights_unused ON color_rights(is_used, user_id) WHERE is_used = FALSE;
+CREATE INDEX idx_color_rights_zone ON color_rights(zone_index);
+CREATE INDEX idx_color_rights_used ON color_rights(used);
 ```
 
 **API 接口：**
@@ -796,6 +874,7 @@ class EconomyService {
 **数据库表：**
 
 ```sql
+-- 注意：不使用外键约束，应用层维护数据一致性
 -- 减半周期配置
 CREATE TABLE halving_schedule (
   cycle               INT PRIMARY KEY,
@@ -818,7 +897,7 @@ CREATE TABLE blocks (
 -- 区块赢家记录
 CREATE TABLE block_winners (
   id                  BIGSERIAL PRIMARY KEY,
-  block_id            BIGINT NOT NULL REFERENCES blocks(id),
+  block_id            BIGINT NOT NULL,  -- 外键字段，但无数据库约束
   user_id             UUID NOT NULL,
   x                   INT NOT NULL,
   y                   INT NOT NULL,
@@ -826,6 +905,7 @@ CREATE TABLE block_winners (
 );
 
 CREATE INDEX idx_block_winners_user ON block_winners(user_id);
+CREATE INDEX idx_block_winners_block ON block_winners(block_id);
 ```
 
 ### 2.3 拍卖服务 (AuctionService)
@@ -838,57 +918,42 @@ CREATE INDEX idx_block_winners_user ON block_winners(user_id);
 **数据库表：**
 
 ```sql
-CREATE TYPE auction_type AS ENUM ('fixed_price', 'bid');
-CREATE TYPE auction_status AS ENUM ('active', 'sold', 'cancelled', 'expired');
+-- 注意：不使用外键约束 (REFERENCES)，应用层维护数据一致性
+CREATE TYPE auction_status AS ENUM ('active', 'sold', 'expired', 'cancelled');
 
 CREATE TABLE auctions (
   id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  seller_id           UUID NOT NULL,
-  color_right_id      BIGINT NOT NULL REFERENCES color_rights(id),
+  seller_id           UUID NOT NULL,        -- 外键字段，但无数据库约束
+  color_right_id      UUID NOT NULL UNIQUE, -- 外键字段，但无数据库约束
   
-  x                   INT NOT NULL,
-  y                   INT NOT NULL,
-  zone                INT NOT NULL,
+  starting_price      BIGINT NOT NULL,
+  current_price       BIGINT NOT NULL,
+  buy_now_price       BIGINT,               -- 一口价
   
-  auction_type        auction_type NOT NULL,
-  
-  -- 定价
-  price               BIGINT NOT NULL,  -- 最小单位：像素币 (PX)
-  currency            VARCHAR(10) DEFAULT 'game_coin',
-  
-  -- 竞价字段（仅 bid 类型）
-  current_bid         BIGINT,
-  current_bidder_id   UUID,
-  bid_count           INT DEFAULT 0,
-  min_bid_increment   BIGINT DEFAULT 0,
-  
-  -- 状态
   status              auction_status DEFAULT 'active',
-  starts_at           TIMESTAMPTZ DEFAULT NOW(),
-  expires_at          TIMESTAMPTZ NOT NULL,
-  sold_at             TIMESTAMPTZ,
-  final_price         BIGINT,
-  buyer_id            UUID,
+  start_time          TIMESTAMPTZ DEFAULT NOW(),
+  end_time            TIMESTAMPTZ NOT NULL,
+  winner_id           UUID,
   
   created_at          TIMESTAMPTZ DEFAULT NOW(),
-  updated_at          TIMESTAMPTZ DEFAULT NOW()
+  updated_at          TIMESTAMPTZ
 );
 
-CREATE INDEX idx_auctions_status ON auctions(status, expires_at);
-CREATE INDEX idx_auctions_zone ON auctions(zone, status);
+CREATE INDEX idx_auctions_status ON auctions(status);
+CREATE INDEX idx_auctions_end_time ON auctions(end_time);
 CREATE INDEX idx_auctions_seller ON auctions(seller_id);
-CREATE INDEX idx_auctions_price ON auctions(price, status) WHERE status = 'active';
 
 -- 竞价记录
-CREATE TABLE auction_bids (
-  id                  BIGSERIAL PRIMARY KEY,
-  auction_id          UUID NOT NULL REFERENCES auctions(id),
-  bidder_id           UUID NOT NULL,
+CREATE TABLE bids (
+  id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  auction_id          UUID NOT NULL,  -- 外键字段，但无数据库约束
+  bidder_id           UUID NOT NULL,  -- 外键字段，但无数据库约束
   amount              BIGINT NOT NULL,
   created_at          TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_auction_bids_auction ON auction_bids(auction_id);
+CREATE INDEX idx_bids_auction ON bids(auction_id);
+CREATE INDEX idx_bids_bidder ON bids(bidder_id);
 ```
 
 **API 接口：**

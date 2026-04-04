@@ -140,12 +140,14 @@ class ColorRightService {
 
   /// 从服务器检查染色权
   Future<bool> _checkFromServer(int x, int y) async {
-    final response = await _httpService.get(
-      '/api/canvas/check-right?x=$x&y=$y',
-    );
-    
-    if (response['success'] == true) {
-      return response['hasRight'] as bool;
+    try {
+      final response = await _httpService.get('/api/canvas/check-right', queryParameters: {'x': x, 'y': y});
+      
+      if (response.data != null && response.data['success'] == true) {
+        return response.data['hasRight'] as bool;
+      }
+    } catch (e) {
+      // 网络错误或其他异常
     }
     
     return false;
@@ -169,12 +171,12 @@ class ColorRightService {
     try {
       final response = await _httpService.get('/api/user/color-rights');
       
-      if (response['success'] == true) {
-        final rightsData = response['data'] as List;
+      if (response.data != null && response.data['success'] == true) {
+        final rightsData = (response.data['data'] as List).cast<Map<String, dynamic>>();
         _colorRights.clear();
         
         for (final data in rightsData) {
-          final right = ColorRight.fromJson(data as Map<String, dynamic>);
+          final right = ColorRight.fromJson(data);
           _colorRights[right.id] = right;
         }
 
@@ -198,12 +200,9 @@ class ColorRightService {
   /// 使用染色权
   Future<bool> useColorRight(String id) async {
     try {
-      final response = await _httpService.post(
-        '/api/user/color-rights/$id/use',
-        {},
-      );
+      final response = await _httpService.post('/api/user/color-rights/$id/use');
 
-      if (response['success'] == true) {
+      if (response.data != null && response.data['success'] == true) {
         // 更新本地状态
         if (_colorRights.containsKey(id)) {
           final right = _colorRights[id]!;
